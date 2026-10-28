@@ -1,0 +1,15 @@
+import { describe, expect, it } from 'vitest';
+import { chooseComputerMove, createGame, getResult, playMove, undoMove } from './engine';
+
+describe('Tic Tac Toe game engine', () => {
+  it('starts a clean game with X', () => { const game = createGame(); expect(game.board).toHaveLength(9); expect(game.board.every(cell => cell === null)).toBe(true); expect(game.currentPlayer).toBe('X'); });
+  it('accepts valid moves and switches turns', () => { const game = playMove(createGame(), 0); expect(game.board[0]).toBe('X'); expect(game.currentPlayer).toBe('O'); expect(game.history).toHaveLength(1); });
+  it('rejects out-of-range, occupied, and wrong-player moves', () => { const game = playMove(createGame(), 0); expect(() => playMove(game, 9)).toThrow(); expect(() => playMove(game, 0)).toThrow(/occupied/i); expect(() => playMove(game, 1, 'X')).toThrow(/turn/i); });
+  it('detects row, column, and diagonal wins', () => { expect(getResult(['X', 'X', 'X', 'O', null, 'O', null, null, null]).winningCells).toEqual([0, 1, 2]); expect(getResult(['O', 'X', null, 'O', 'X', null, 'O', null, 'X']).winner).toBe('O'); expect(getResult(['X', 'O', null, null, 'X', 'O', null, null, 'X']).winningCells).toEqual([0, 4, 8]); });
+  it('detects a draw', () => { const result = getResult(['X', 'O', 'X', 'X', 'O', 'O', 'O', 'X', 'X']); expect(result.status).toBe('draw'); expect(result.winner).toBeNull(); });
+  it('updates the scoreboard once when a game is won and blocks later moves', () => { let game = createGame(); for (const index of [0, 3, 1, 4]) game = playMove(game, index); game = playMove(game, 2); expect(game.status).toBe('won'); expect(game.scores.xWins).toBe(1); expect(() => playMove(game, 5)).toThrow(/complete/i); });
+  it('undoes one move in two-player mode and restores the turn', () => { let game = playMove(createGame(), 0); game = playMove(game, 4); const undone = undoMove(game); expect(undone.board[4]).toBeNull(); expect(undone.currentPlayer).toBe('O'); expect(undone.history).toHaveLength(1); });
+  it('undoes the human/computer pair in computer mode', () => { let game = createGame('computer'); game = playMove(game, 0); game = playMove(game, chooseComputerMove(game.board), 'O'); const undone = undoMove(game); expect(undone.history).toHaveLength(0); expect(undone.board.every(cell => cell === null)).toBe(true); expect(undone.currentPlayer).toBe('X'); });
+  it('computer takes a winning move, blocks a threat, then prefers center and corners', () => { expect(chooseComputerMove(['O', 'O', null, 'X', 'X', null, null, null, null])).toBe(2); expect(chooseComputerMove(['X', 'X', null, 'O', null, null, null, null, null])).toBe(2); expect(chooseComputerMove(['X', null, null, null, null, null, null, null, null])).toBe(4); expect([0, 2, 6, 8]).toContain(chooseComputerMove(['X', null, null, null, 'O', null, null, null, null])); });
+  it('keeps a game terminal state and scores unchanged after invalid post-completion actions', () => { let game = createGame(); for (const index of [0, 3, 1, 4, 2]) game = playMove(game, index); expect(game.status).toBe('won'); expect(game.scores.xWins).toBe(1); expect(undoMove(game)).toEqual(game); });
+});
